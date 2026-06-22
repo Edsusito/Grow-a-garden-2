@@ -1,0 +1,179 @@
+--// Edsusito Farm v2
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- ========== UI ==========
+local Window = Rayfield:CreateWindow({
+    Name = "🌱 Edsusito Farm v2",
+    LoadingTitle = "Edsusito Farm",
+    LoadingSubtitle = "Sistema Completo",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "EdsusitoFarm"
+    }
+})
+
+-- TABS
+local FarmTab = Window:CreateTab("🌿 Farm")
+local PlantTab = Window:CreateTab("🌾 Plantar")
+local PlayerTab = Window:CreateTab("👤 Player")
+local EventTab = Window:CreateTab("🎉 Eventos")
+
+-- ========== VARIABLES ==========
+local AutoCollect = false
+local CollectMode = "All"
+local SelectedFruit = ""
+local Exceptions = {}
+
+local AutoPlant = false
+local PlantMode = "Below" -- Below / Line / Point
+
+-- ========== FUNCIONES BASE ==========
+
+-- 🔹 RECOLECCIÓN
+local function ShouldCollect(fruitName)
+    if CollectMode == "All" then
+        if table.find(Exceptions, fruitName) then
+            return false
+        end
+        return true
+
+    elseif CollectMode == "Specific" then
+        return fruitName == SelectedFruit
+    end
+end
+
+local function CollectLoop()
+    while AutoCollect do
+        -- Ejemplo: recorrer jardín
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                local fruitName = v.Name
+
+                if ShouldCollect(fruitName) then
+                    -- AQUÍ VA LA LÓGICA REAL
+                    -- Ejemplo: fireproximityprompt(v.ProximityPrompt)
+                    print("Recolectando:", fruitName)
+                end
+            end
+        end
+        
+        task.wait(1)
+    end
+end
+
+-- 🔹 PLANTADO
+local function PlantAtPosition(position)
+    -- Aquí irá la lógica real del plantado
+    print("Plantando en:", position)
+end
+
+local function PlantLoop()
+    while AutoPlant do
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local root = char.HumanoidRootPart
+
+            if PlantMode == "Below" then
+                PlantAtPosition(root.Position)
+
+            elseif PlantMode == "Line" then
+                for i = 1, 5 do
+                    local offset = Vector3.new(i * 3, 0, 0)
+                    PlantAtPosition(root.Position + offset)
+                end
+
+            elseif PlantMode == "Point" then
+                local fixedPoint = Vector3.new(0, 5, 0)
+                PlantAtPosition(fixedPoint)
+            end
+        end
+
+        task.wait(1)
+    end
+end
+
+-- ========== UI FARM ==========
+
+FarmTab:CreateToggle({
+    Name = "🌾 Auto Recolectar",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoCollect = Value
+        if Value then
+            task.spawn(CollectLoop)
+        end
+    end
+})
+
+FarmTab:CreateDropdown({
+    Name = "Modo de Recolección",
+    Options = {"All", "Specific"},
+    CurrentOption = "All",
+    Callback = function(Value)
+        CollectMode = Value
+    end
+})
+
+FarmTab:CreateInput({
+    Name = "🍎 Fruta específica",
+    PlaceholderText = "Ej: Apple",
+    Callback = function(Text)
+        SelectedFruit = Text
+    end
+})
+
+FarmTab:CreateInput({
+    Name = "❌ Añadir excepción",
+    PlaceholderText = "Fruta a ignorar",
+    Callback = function(Text)
+        table.insert(Exceptions, Text)
+    end
+})
+
+-- ========== UI PLANTAR ==========
+
+PlantTab:CreateToggle({
+    Name = "🌱 Auto Plantar",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoPlant = Value
+        if Value then
+            task.spawn(PlantLoop)
+        end
+    end
+})
+
+PlantTab:CreateDropdown({
+    Name = "Modo de Plantado",
+    Options = {"Below", "Line", "Point"},
+    CurrentOption = "Below",
+    Callback = function(Value)
+        PlantMode = Value
+    end
+})
+
+-- ========== PLAYER ==========
+
+PlayerTab:CreateSlider({
+    Name = "Speed",
+    Range = {16, 150},
+    CurrentValue = 16,
+    Callback = function(Value)
+        LocalPlayer.Character.Humanoid.WalkSpeed = Value
+    end
+})
+
+-- ========== EVENTOS (FUTURO) ==========
+
+EventTab:CreateLabel("🎉 Sistema listo para eventos futuros")
+
+EventTab:CreateButton({
+    Name = "🔒 Próximamente...",
+    Callback = function()
+        print("Sistema de eventos en desarrollo")
+    end
+})
