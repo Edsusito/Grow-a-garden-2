@@ -1,179 +1,486 @@
---// Edsusito Farm v2
+--// Edsusito Farm v2 - Sistema Completo Profesional
+--// ESTRUCTURA MODULAR ESCALABLE
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
+-- ========== SERVICIOS Y VARIABLES GLOBALES ==========
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
 
--- ========== UI ==========
-local Window = Rayfield:CreateWindow({
-    Name = "🌱 Edsusito Farm v2",
-    LoadingTitle = "Edsusito Farm",
-    LoadingSubtitle = "Sistema Completo",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "EdsusitoFarm"
-    }
-})
+-- ========== CONFIGURACIÓN CENTRAL ==========
+local Config = {
+    ScriptVersion = "2.0",
+    GameName = "Grow a Garden 2",
+    ScriptName = "Edsusito Farm",
+    AutoSaveConfig = true
+}
 
--- TABS
-local FarmTab = Window:CreateTab("🌿 Farm")
-local PlantTab = Window:CreateTab("🌾 Plantar")
-local PlayerTab = Window:CreateTab("👤 Player")
-local EventTab = Window:CreateTab("🎉 Eventos")
+-- ========== ESTADO DEL SISTEMA ==========
+local SystemState = {
+    -- Farm
+    AutoCollect = false,
+    CollectMode = "All",
+    SelectedFruit = "",
+    Exceptions = {},
+    CollectDelay = 1,
+    
+    -- Plant
+    AutoPlant = false,
+    PlantMode = "Below",
+    PlantDelay = 1,
+    LineMode_Count = 5,
+    LineMode_Distance = 3,
+    
+    -- Player
+    WalkSpeed = 16,
+    JumpPower = 50,
+    
+    -- System
+    IsRunning = true,
+    DebugMode = false
+}
 
--- ========== VARIABLES ==========
-local AutoCollect = false
-local CollectMode = "All"
-local SelectedFruit = ""
-local Exceptions = {}
+-- ========== FUNCIONES AUXILIARES ==========
 
-local AutoPlant = false
-local PlantMode = "Below" -- Below / Line / Point
+local function Debug(message)
+    if SystemState.DebugMode then
+        print("[EDSUSITO FARM DEBUG] " .. tostring(message))
+    end
+end
 
--- ========== FUNCIONES BASE ==========
+local function SafeCall(func, ...)
+    local success, result = pcall(func, ...)
+    if not success then
+        Debug("Error: " .. tostring(result))
+    end
+    return success, result
+end
 
--- 🔹 RECOLECCIÓN
-local function ShouldCollect(fruitName)
-    if CollectMode == "All" then
-        if table.find(Exceptions, fruitName) then
+-- ========== MÓDULO: FARM (RECOLECCIÓN) ==========
+
+local FarmModule = {}
+
+function FarmModule:ShouldCollect(fruitName)
+    if SystemState.CollectMode == "All" then
+        if table.find(SystemState.Exceptions, fruitName) then
             return false
         end
         return true
-
-    elseif CollectMode == "Specific" then
-        return fruitName == SelectedFruit
+    elseif SystemState.CollectMode == "Specific" then
+        return fruitName == SystemState.SelectedFruit
     end
+    return false
 end
 
-local function CollectLoop()
-    while AutoCollect do
-        -- Ejemplo: recorrer jardín
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("BasePart") then
-                local fruitName = v.Name
-
-                if ShouldCollect(fruitName) then
-                    -- AQUÍ VA LA LÓGICA REAL
-                    -- Ejemplo: fireproximityprompt(v.ProximityPrompt)
-                    print("Recolectando:", fruitName)
+function FarmModule:CollectLoop()
+    Debug("Iniciando Farm Loop...")
+    while SystemState.AutoCollect and SystemState.IsRunning do
+        SafeCall(function()
+            for _, v in pairs(workspace:GetDescendants()) do
+                if SystemState.AutoCollect == false then break end
+                
+                if v:IsA("BasePart") and v.Parent then
+                    local fruitName = v.Name
+                    
+                    if self:ShouldCollect(fruitName) then
+                        -- LÓGICA DE RECOLECCIÓN
+                        if v:FindFirstChild("ProximityPrompt") then
+                            fireproximityprompt(v.ProximityPrompt)
+                            Debug("Recolectando: " .. fruitName)
+                        end
+                    end
                 end
             end
-        end
+        end)
         
-        task.wait(1)
+        task.wait(SystemState.CollectDelay)
+    end
+    Debug("Farm Loop detenido")
+end
+
+function FarmModule:Start()
+    if not SystemState.AutoCollect then
+        SystemState.AutoCollect = true
+        task.spawn(function() self:CollectLoop() end)
     end
 end
 
--- 🔹 PLANTADO
-local function PlantAtPosition(position)
-    -- Aquí irá la lógica real del plantado
-    print("Plantando en:", position)
+function FarmModule:Stop()
+    SystemState.AutoCollect = false
 end
 
-local function PlantLoop()
-    while AutoPlant do
+-- ========== MÓDULO: PLANT (PLANTADO) ==========
+
+local PlantModule = {}
+
+function PlantModule:PlantAtPosition(position)
+    SafeCall(function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
-            local root = char.HumanoidRootPart
-
-            if PlantMode == "Below" then
-                PlantAtPosition(root.Position)
-
-            elseif PlantMode == "Line" then
-                for i = 1, 5 do
-                    local offset = Vector3.new(i * 3, 0, 0)
-                    PlantAtPosition(root.Position + offset)
-                end
-
-            elseif PlantMode == "Point" then
-                local fixedPoint = Vector3.new(0, 5, 0)
-                PlantAtPosition(fixedPoint)
-            end
+            -- LÓGICA DE PLANTADO EN POSICIÓN
+            Debug("Plantando en: " .. tostring(position))
         end
+    end)
+end
 
-        task.wait(1)
+function PlantModule:PlantLoop()
+    Debug("Iniciando Plant Loop...")
+    while SystemState.AutoPlant and SystemState.IsRunning do
+        SafeCall(function()
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local root = char.HumanoidRootPart
+                
+                if SystemState.PlantMode == "Below" then
+                    self:PlantAtPosition(root.Position)
+                    
+                elseif SystemState.PlantMode == "Line" then
+                    for i = 1, SystemState.LineMode_Count do
+                        if not SystemState.AutoPlant then break end
+                        local offset = Vector3.new(i * SystemState.LineMode_Distance, 0, 0)
+                        self:PlantAtPosition(root.Position + offset)
+                        task.wait(0.1)
+                    end
+                    
+                elseif SystemState.PlantMode == "Point" then
+                    local fixedPoint = Vector3.new(0, 5, 0)
+                    self:PlantAtPosition(fixedPoint)
+                end
+            end
+        end)
+        
+        task.wait(SystemState.PlantDelay)
+    end
+    Debug("Plant Loop detenido")
+end
+
+function PlantModule:Start()
+    if not SystemState.AutoPlant then
+        SystemState.AutoPlant = true
+        task.spawn(function() self:PlantLoop() end)
     end
 end
 
--- ========== UI FARM ==========
+function PlantModule:Stop()
+    SystemState.AutoPlant = false
+end
+
+-- ========== MÓDULO: PLAYER ==========
+
+local PlayerModule = {}
+
+function PlayerModule:SetSpeed(value)
+    SafeCall(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = value
+            SystemState.WalkSpeed = value
+            Debug("Velocidad establecida a: " .. value)
+        end
+    end)
+end
+
+function PlayerModule:Teleport(position)
+    SafeCall(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(position)
+        end
+    end)
+end
+
+-- ========== CREACIÓN DE UI RAYFIELD ==========
+
+local Window = Rayfield:CreateWindow({
+    Name = "🌱 " .. Config.ScriptName .. " v" .. Config.ScriptVersion,
+    LoadingTitle = Config.ScriptName,
+    LoadingSubtitle = "Sistema Completo - " .. Config.GameName,
+    ConfigurationSaving = {
+        Enabled = Config.AutoSaveConfig,
+        FolderName = "EdsusitoFarm",
+        FileName = "config.json"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "noinvitelink",
+        RememberJoins = true
+    },
+    KeySystem = false
+})
+
+-- ========== TAB 1: FARM (RECOLECCIÓN) ==========
+
+local FarmTab = Window:CreateTab("🌿 Farm", nil)
+
+FarmTab:CreateSection("⚙️ Control Principal")
 
 FarmTab:CreateToggle({
     Name = "🌾 Auto Recolectar",
     CurrentValue = false,
     Callback = function(Value)
-        AutoCollect = Value
         if Value then
-            task.spawn(CollectLoop)
+            FarmModule:Start()
+        else
+            FarmModule:Stop()
         end
     end
 })
+
+FarmTab:CreateSection("🎛️ Configuración")
 
 FarmTab:CreateDropdown({
     Name = "Modo de Recolección",
     Options = {"All", "Specific"},
     CurrentOption = "All",
     Callback = function(Value)
-        CollectMode = Value
+        SystemState.CollectMode = Value
+        Debug("Modo de recolección cambiado a: " .. Value)
     end
 })
 
 FarmTab:CreateInput({
-    Name = "🍎 Fruta específica",
-    PlaceholderText = "Ej: Apple",
+    Name = "🍎 Fruta Específica",
+    PlaceholderText = "Ej: Apple, Banana, etc.",
+    RemoveTextAfterFocusLost = false,
     Callback = function(Text)
-        SelectedFruit = Text
+        SystemState.SelectedFruit = Text
+        Debug("Fruta seleccionada: " .. Text)
     end
 })
 
+FarmTab:CreateSection("⛔ Excepciones")
+
 FarmTab:CreateInput({
-    Name = "❌ Añadir excepción",
+    Name = "Añadir Excepción",
     PlaceholderText = "Fruta a ignorar",
+    RemoveTextAfterFocusLost = true,
     Callback = function(Text)
-        table.insert(Exceptions, Text)
+        if Text and Text ~= "" then
+            table.insert(SystemState.Exceptions, Text)
+            Debug("Excepción añadida: " .. Text)
+        end
     end
 })
 
--- ========== UI PLANTAR ==========
+FarmTab:CreateButton({
+    Name = "🗑️ Limpiar Excepciones",
+    Callback = function()
+        SystemState.Exceptions = {}
+        Debug("Excepciones limpias")
+    end
+})
+
+FarmTab:CreateSection("⏱️ Velocidad")
+
+FarmTab:CreateSlider({
+    Name = "Velocidad de Recolección",
+    Range = {0.1, 5},
+    Increment = 0.1,
+    Suffix = "s",
+    CurrentValue = 1,
+    Callback = function(Value)
+        SystemState.CollectDelay = Value
+        Debug("Delay de recolección: " .. Value)
+    end
+})
+
+-- ========== TAB 2: PLANT (PLANTADO) ==========
+
+local PlantTab = Window:CreateTab("🌾 Plantar", nil)
+
+PlantTab:CreateSection("⚙️ Control Principal")
 
 PlantTab:CreateToggle({
     Name = "🌱 Auto Plantar",
     CurrentValue = false,
     Callback = function(Value)
-        AutoPlant = Value
         if Value then
-            task.spawn(PlantLoop)
+            PlantModule:Start()
+        else
+            PlantModule:Stop()
         end
     end
 })
+
+PlantTab:CreateSection("🎛️ Configuración de Modo")
 
 PlantTab:CreateDropdown({
     Name = "Modo de Plantado",
     Options = {"Below", "Line", "Point"},
     CurrentOption = "Below",
     Callback = function(Value)
-        PlantMode = Value
+        SystemState.PlantMode = Value
+        Debug("Modo de plantado: " .. Value)
     end
 })
 
--- ========== PLAYER ==========
+PlantTab:CreateSection("📏 Configuración - Línea")
+
+PlantTab:CreateSlider({
+    Name = "Cantidad de Plantas (Line)",
+    Range = {1, 20},
+    Increment = 1,
+    CurrentValue = 5,
+    Callback = function(Value)
+        SystemState.LineMode_Count = Value
+        Debug("Cantidad de plantas: " .. Value)
+    end
+})
+
+PlantTab:CreateSlider({
+    Name = "Distancia entre Plantas (Line)",
+    Range = {1, 20},
+    Increment = 0.5,
+    Suffix = "u",
+    CurrentValue = 3,
+    Callback = function(Value)
+        SystemState.LineMode_Distance = Value
+        Debug("Distancia entre plantas: " .. Value)
+    end
+})
+
+PlantTab:CreateSection("⏱️ Velocidad")
+
+PlantTab:CreateSlider({
+    Name = "Velocidad de Plantado",
+    Range = {0.1, 5},
+    Increment = 0.1,
+    Suffix = "s",
+    CurrentValue = 1,
+    Callback = function(Value)
+        SystemState.PlantDelay = Value
+        Debug("Delay de plantado: " .. Value)
+    end
+})
+
+-- ========== TAB 3: PLAYER ==========
+
+local PlayerTab = Window:CreateTab("👤 Player", nil)
+
+PlayerTab:CreateSection("⚙️ Movimiento")
 
 PlayerTab:CreateSlider({
-    Name = "Speed",
+    Name = "Velocidad de Caminata",
     Range = {16, 150},
+    Increment = 1,
+    Suffix = "u/s",
     CurrentValue = 16,
     Callback = function(Value)
-        LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        SystemState.WalkSpeed = Value
+        PlayerModule:SetSpeed(Value)
     end
 })
 
--- ========== EVENTOS (FUTURO) ==========
+PlayerTab:CreateSection("🎮 Utilidades")
+
+PlayerTab:CreateButton({
+    Name = "📍 Mostrar Posición Actual",
+    Callback = function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local pos = LocalPlayer.Character.HumanoidRootPart.Position
+            print("Posición: X=" .. math.round(pos.X) .. " Y=" .. math.round(pos.Y) .. " Z=" .. math.round(pos.Z))
+        end
+    end
+})
+
+-- ========== TAB 4: EVENTOS (FUTURO) ==========
+
+local EventTab = Window:CreateTab("🎉 Eventos", nil)
+
+EventTab:CreateSection("📢 Sistema de Eventos")
 
 EventTab:CreateLabel("🎉 Sistema listo para eventos futuros")
 
 EventTab:CreateButton({
-    Name = "🔒 Próximamente...",
+    Name = "🔒 Sistema de Eventos (Próximamente)",
     Callback = function()
-        print("Sistema de eventos en desarrollo")
+        Rayfield:Notify({
+            Title = "Próximamente",
+            Content = "El sistema de eventos se agregará en futuras actualizaciones",
+            Duration = 6.5,
+            Image = 4483362458,
+        })
     end
 })
+
+-- ========== TAB 5: CONFIGURACIÓN DEL SISTEMA ==========
+
+local SettingsTab = Window:CreateTab("⚙️ Sistema", nil)
+
+SettingsTab:CreateSection("📊 Información")
+
+SettingsTab:CreateLabel("Script: " .. Config.ScriptName)
+SettingsTab:CreateLabel("Versión: " .. Config.ScriptVersion)
+SettingsTab:CreateLabel("Juego: " .. Config.GameName)
+
+SettingsTab:CreateSection("🐛 Debug")
+
+SettingsTab:CreateToggle({
+    Name = "Modo Debug",
+    CurrentValue = false,
+    Callback = function(Value)
+        SystemState.DebugMode = Value
+        if Value then
+            print("[EDSUSITO FARM] Modo Debug Activado")
+        end
+    end
+})
+
+SettingsTab:CreateSection("🔌 Estado del Sistema")
+
+SettingsTab:CreateButton({
+    Name = "🛑 Detener Todo",
+    Callback = function()
+        FarmModule:Stop()
+        PlantModule:Stop()
+        Rayfield:Notify({
+            Title = "Sistema Detenido",
+            Content = "Todos los procesos han sido detenidos",
+            Duration = 4,
+            Image = 4483362458,
+        })
+    end
+})
+
+SettingsTab:CreateButton({
+    Name = "🔄 Reiniciar Script",
+    Callback = function()
+        FarmModule:Stop()
+        PlantModule:Stop()
+        SystemState.IsRunning = false
+        task.wait(0.5)
+        Rayfield:Notify({
+            Title = "Reinicio",
+            Content = "Script reiniciado. Por favor, vuelve a ejecutar el script.",
+            Duration = 4,
+            Image = 4483362458,
+        })
+    end
+})
+
+-- ========== NOTIFICACIÓN FINAL ==========
+
+Rayfield:Notify({
+    Title = "🌱 " .. Config.ScriptName,
+    Content = "Sistema cargado exitosamente v" .. Config.ScriptVersion,
+    Duration = 4.5,
+    Image = 4483362458,
+})
+
+Debug("Script completamente cargado y listo para usar")
+
+-- ========== LIMPIEZA AL CERRAR SCRIPT ==========
+
+game:GetService("RunService").Heartbeat:Connect(function()
+    if not SystemState.IsRunning then
+        FarmModule:Stop()
+        PlantModule:Stop()
+    end
+end)
+
+return {
+    FarmModule = FarmModule,
+    PlantModule = PlantModule,
+    PlayerModule = PlayerModule,
+    SystemState = SystemState,
+    Config = Config
+}
